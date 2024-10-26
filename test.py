@@ -1,4 +1,5 @@
 from collections import deque
+from functools import reduce
 import time
 from typing import List
 import numpy as np
@@ -81,7 +82,7 @@ class Group:
         self.special_eyes = set()
         self.eye_likes = set()
         self.territory = set()
-        self.liberties = set()
+        self.liberties = np.zeros(0, dtype=int)
         self.stability = -1
 
     def addIndex(self, idx: int) -> None:
@@ -328,6 +329,8 @@ class StringManager:
             group.eye_likes = set.union(*[self.strings[idx].eye_likes for idx in group.indices_of_strings])
             group.special_eyes = set.union(*[self.strings[idx].special_eyes for idx in group.indices_of_strings])
 
+            group.liberties = reduce(np.add, [self.strings[idx].liberties for idx in group.indices_of_strings])
+
             self.locateContiguousEyesOfGroup(group)
 
         
@@ -421,6 +424,9 @@ class Debugger:
                     string = self.score.string_manager.strings[idx]
                     for stone in np.nonzero(string.stones)[0]:
                         out_string[stone // rl][stone % rl] = "⚪"
+                
+                for idx in np.nonzero(group.liberties)[0]:
+                    out_string[idx // rl][idx % rl] = "🟢"
 
                 for line in out_string:
                     f.write("".join(line) + "\n")
