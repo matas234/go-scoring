@@ -14,9 +14,11 @@ class String:
         self.nature = 0
         self.liberties = np.zeros(total_length, dtype=int)
 
-        self.eyes = []
-        self.special_eyes = []
-        self.eye_likes = []
+        self.eyes = set()
+        self.potential_eyes = set()
+        self.special_eyes = set()
+        self.eye_likes = set()
+        self.eyes_in_group = set()
 
 
     def addStone(self, idx: int) -> None:
@@ -27,14 +29,16 @@ class String:
         self.liberties[idx] = self.nature
 
     def addEye(self, idx: int) -> None:
-        self.eyes.append(idx)
+        self.eyes.add(idx)
 
     def addSpecialEye(self, idx: int) -> None:
-        self.special_eyes.append(idx)
+        self.special_eyes.add(idx)
 
     def addEyeLike(self, idx: int) -> None:
-        self.eye_likes.append(idx)
+        self.eye_likes.add(idx)
 
+    def addPotentialEye(self, idx: int) -> None:
+        self.potential_eyes.add(idx)
 
     def generateConnectinos(self) -> None:
         row_length = int(np.sqrt(len(self.half_connections)))
@@ -69,6 +73,22 @@ class String:
          
 
 
+class Group:
+    def __init__(self) -> None:
+        self.indices_of_strings = []
+        self.eyes = 0
+        self.eyes_set = set()
+        self.special_eyes = set()
+        self.eye_likes = set()
+        self.territory = set()
+        self.liberties = set()
+
+    def addIndex(self, idx: int) -> None:
+        self.indices_of_strings.append(idx)
+
+
+
+
 class Score:
     def __init__(self, board, size):
         self.row_length = size
@@ -76,7 +96,7 @@ class Score:
         self.board = board.copy()
 
         self._cardinals_cache = [self.__computeCardinals(i) for i in range(self.total_length)]
-        self._neighbor_cache = [self._computeNeighbors(i) for i in range(self.total_length)]
+        self._neighbor_cache = [self.__computeNeighbors(i) for i in range(self.total_length)]
 
         self.debugger = Debugger(self)
         self.string_manager = StringManager(self)
@@ -96,15 +116,15 @@ class Score:
 
         return cardinals 
     
-    def _computeNeighbors(self, idx: int) -> List[int]:
+    def __computeNeighbors(self, idx: int) -> List[int]:
         neighbors = []
         rl = self.row_length
         
         for offset in [rl, -rl, 1, -1, rl+1, rl-1, -rl+1, -rl-1]:
             neigh = idx + offset
             if (0 <= neigh < self.total_length and                       # in bounds of the board
-                not ((offset - rl) % rl == 18 and idx % rl == 0) and   # 
-                not ((offset + rl) % rl == 1 and (idx + 1) % rl == 0)  # handling edges
+                not (offset%rl == 18 and idx % rl == 0) and   # 
+                not (offset% rl == 1 and (idx + 1) % rl == 0)  # handling edges
             ):
                 neighbors.append(neigh)
 
@@ -121,7 +141,7 @@ class Bouzy:
         self.buffer_nature = np.zeros(self.score.total_length, dtype=int)
         self.buffer_intensity = np.zeros(self.score.total_length, dtype=int)
 
-    def bouzy(self, n, k) -> None:
+    def bouzyAlgorithm(self, n, k) -> None:
         for _ in range(n):
             self.__dilateBoard()
         for _ in range(k):
@@ -182,7 +202,7 @@ class StringManager:
     def __init__(self, score_istance: Score) -> None:
         self.score = score_istance
         self.strings: List[String] = []
-        self.groups = []
+        self.groups: List[Group] = []
 
 
     def findStrings(self) -> None:
@@ -219,7 +239,7 @@ class StringManager:
             if i in used_indices:
                 continue  
 
-            current_group = []
+            current_group = Group()
             queue = deque([(i, self.strings[i].nature)])
 
             while queue:
@@ -228,7 +248,7 @@ class StringManager:
                 if idx in used_indices:
                     continue  
 
-                current_group.append(idx)
+                current_group.addIndex(idx)
                 used_indices.add(idx)
 
                 for j in range(len(self.strings)):
@@ -262,8 +282,6 @@ class StringManager:
                 enemy_neighbors = sum(1 for n in neighbors if (self.score.board[n] == -string.nature))
                 enemy_cardinals = sum(1 for n in cardinals if (self.score.board[n] == -string.nature))
                 enemy_corners = enemy_neighbors - enemy_cardinals
-
-                empty_neighbors = sum(1 for n in neighbors if (self.score.board[n] == 0))    
                 
 
                 if same_string_cardinals == len(cardinals):                                                    # think about edges IMPORTANT
@@ -272,24 +290,72 @@ class StringManager:
                 elif enemy_neighbors == 0 and friendly_neighbors >= 6 and friendly_cardinals == 4:
                     string.addEye(lib_idx)
 
-
                 elif friendly_neighbors == 7 and enemy_neighbors == 0:
                     string.addEye(lib_idx)
 
-                elif friendly_neighbors >= 6 and enemy_corners <= 1:
+                if friendly_neighbors >= 6 and enemy_corners <= 1:
                     string.addSpecialEye(lib_idx)
 
                 elif friendly_neighbors >= 5 and enemy_neighbors == 0:
                     string.addEyeLike(lib_idx)
+
+
+
+    def generateGroupProperties(self) -> None:
+        for group in self.groups:
+            group.eyes_set = set.union(*[self.strings[idx].eyes for idx in group.indices_of_strings])
+            group.eyes = len(group.eyes_set)
+            group.potential_eyes = set.union(*[self.strings[idx].potential_eyes for idx in group.indices_of_strings])
+            group.eye_likes = set.union(*[self.strings[idx].eye_likes for idx in group.indices_of_strings])
+            group.special_eyes = set.union(*[self.strings[idx].special_eyes for idx in group.indices_of_strings])
+
+            self.locateContiguousEyesOfGroup(group)
+
+        
+    def locateContiguousEyesOfGroup(self, group: Group) -> None:
+        visited = set()
+        
+        def _dfs(idx: int, sequence: list, to_remove: int) -> list:
+            visited.add(idx)
+
+            if idx in group.eyes_set:
+                to_remove += 1
+
+            sequence.append('E' if idx in group.eye_likes else 'S')
+
+            for neigh in self.score._neighbor_cache[idx]:
+                if neigh not in visited and (neigh in group.eye_likes or neigh in group.special_eyes):
+                    sequence, to_remove= _dfs(neigh, sequence, to_remove)
+            
+            return sequence, to_remove
+
+        for idx in group.eye_likes | group.special_eyes:
+            if idx not in visited:
+
+                sequence, to_remove = _dfs(idx, [], 0)
+                print(sequence)
                 
+                # Count eyes using a sliding window approach
+                i = 0
+                eye_count = 0
+                while i < len(sequence):
+                    if i <= len(sequence) - 2:  
+                        if sequence[i:i+2] in [['E', 'S'], ['S', 'E'], ['S', 'S']]:
+                            eye_count += 1
+                            i += 2 
+                            continue
+                
+                    elif i <= len(sequence) - 3:  
+                        if sequence[i:i+3] == ['E', 'E', 'E']:
+                            eye_count += 1
+                            i += 3
+                            continue
+                    i += 1
+
+                group.eyes += eye_count - to_remove
 
 
-
-
-
-
-
-
+                
 
 class Debugger:
     def __init__(self, score_instance: Score) -> None:
@@ -323,12 +389,29 @@ class Debugger:
         to_plot = np.zeros(self.score.total_length, dtype=int)
         
         for idx, group in enumerate(self.score.string_manager.groups):
-            for j in group:
+            for j in group.indices_of_strings:
                 to_plot += (idx + 1) * self.score.string_manager.strings[j].stones
 
         sns.heatmap(np.reshape(to_plot, (self.score.row_length, self.score.row_length)), annot=True, cmap="coolwarm", cbar=True, center=0)
-        plt.savefig("assets/hgroups.png", dpi=300, bbox_inches='tight')       
+        plt.savefig("assets/hgroups.png", dpi=300, bbox_inches='tight')  
 
+    def printGroupsText(self) -> None:
+        rl = self.score.row_length
+        with open("assets/out2.txt", "w", encoding="utf-8") as f:     
+            for group in self.score.string_manager.groups:
+                out_string = [["⚫"]*rl for _ in range(rl)]
+
+                for idx in group.indices_of_strings:
+                    string = self.score.string_manager.strings[idx]
+                    for stone in np.nonzero(string.stones)[0]:
+                        out_string[stone // rl][stone % rl] = "⚪"
+
+                for line in out_string:
+                    f.write("".join(line) + "\n")
+                f.write(f"eyes: {group.eyes}\n")  
+                f.write(f"special eyes: {group.special_eyes}\n") 
+                f.write(f"eye likes: {group.eye_likes}\n") 
+                
 
     def printStringsText(self):
         rl = self.score.row_length
@@ -337,8 +420,6 @@ class Debugger:
                 string = self.score.string_manager.strings[i]
 
                 out_string = [["⚫"]*rl for _ in range(rl)]
-                out_con = [["⚫"]*rl for _ in range(rl)]
-                out_libs = [["⚫"]*rl for _ in range(rl)]
 
                 for idx in np.nonzero(string.stones)[0]:
                     out_string[idx // rl][idx % rl] = "⚪"
@@ -359,29 +440,30 @@ class Debugger:
 
 
                 for line_index in range(rl):
-                    f.write(f"{''.join(out_string[line_index])}  {''.join(out_con[line_index])}  {''.join(out_libs[line_index])} \n")
-                f.write("\n\n")
+                    f.write(f"{''.join(out_string[line_index])}\n")
+                f.write(f"Eyes: {string.eyes}\n")
 
 
 
 
 board = loadGame("games/eyes.sgf")
-potential = Score(board = board, size = int(np.sqrt(board.size)))
-
 
 
 s = time.time()
+
 potential = Score(board = board, size = int(np.sqrt(board.size)))
-potential.bouzy.bouzy(8, 21)
+potential.bouzy.bouzyAlgorithm(8, 21)
 potential.string_manager.findStrings()
 potential.string_manager.findGroups()
 potential.string_manager.findEyes()
-
+potential.string_manager.generateGroupProperties()
 
 e = time.time()
 print(f"Took {e-s} seconds")
+print("test")
 
 
-potential.debugger.printGroups()
-potential.debugger.printHeatMap()
+# potential.debugger.printGroups()
+# potential.debugger.printHeatMap()
 potential.debugger.printStringsText()
+potential.debugger.printGroupsText()
