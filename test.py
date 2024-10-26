@@ -82,9 +82,28 @@ class Group:
         self.eye_likes = set()
         self.territory = set()
         self.liberties = set()
+        self.stability = -1
 
     def addIndex(self, idx: int) -> None:
         self.indices_of_strings.append(idx)
+
+    def computeStabbaility(self) -> None:
+        if self.eyes >= 2:
+            self.stability = 100
+
+        elif (self.eyes == 1 and
+              len(self.special_eyes) + self.eye_likes >= 2 and   ##### HAVE TO BE NOT CONTIGOUS IMPORTANT
+              self.territory >= 3
+              ):
+            self.stability = 100
+
+        elif (self.eyes == 0 and
+              self.territory >= 6
+              ):
+            self.stability = 100
+
+        else:
+            self.stability = 520 - (self.eyes / 2) - (self.liberties * 2) - (self.territory / 2)
 
 
 
@@ -333,9 +352,7 @@ class StringManager:
             if idx not in visited:
 
                 sequence, to_remove = _dfs(idx, [], 0)
-                print(sequence)
                 
-                # Count eyes using a sliding window approach
                 i = 0
                 eye_count = 0
                 while i < len(sequence):
@@ -351,8 +368,8 @@ class StringManager:
                             i += 3
                             continue
                     i += 1
-
-                group.eyes += eye_count - to_remove
+                if eye_count > 0:
+                    group.eyes += eye_count - to_remove
 
 
                 
@@ -376,7 +393,6 @@ class Debugger:
         for idx, string in enumerate(self.score.string_manager.strings):
             stones = string.stones * (idx + 1)
             to_plot += stones 
-            print(string.eyes)
             for eye in string.eyes:
                 to_plot[eye] = string.nature * 100
 
@@ -459,11 +475,12 @@ potential.string_manager.findEyes()
 potential.string_manager.generateGroupProperties()
 
 e = time.time()
+
 print(f"Took {e-s} seconds")
-print("test")
 
 
-# potential.debugger.printGroups()
-# potential.debugger.printHeatMap()
+
+potential.debugger.printGroups()
+potential.debugger.printHeatMap()
 potential.debugger.printStringsText()
 potential.debugger.printGroupsText()
