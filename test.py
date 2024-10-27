@@ -128,7 +128,7 @@ class Score:
         
         for offset in [self.row_length, -self.row_length, 1, -1]:
             cardinal = indx + offset
-            if (0 <= cardinal < self.total_length and                       # in bounds of the board
+            if (0 <= cardinal < self.total_length and                    # in bounds of the board
                 not (offset == -1 and indx % self.row_length == 0) and   # 
                 not (offset == 1 and (indx + 1) % self.row_length == 0)  # handling edges
             ):
@@ -142,8 +142,8 @@ class Score:
         
         for offset in [rl, -rl, 1, -1, rl+1, rl-1, -rl+1, -rl-1]:
             neigh = idx + offset
-            if (0 <= neigh < self.total_length and                       # in bounds of the board
-                not (offset%rl == 18 and idx % rl == 0) and   # 
+            if (0 <= neigh < self.total_length and             # in bounds of the board
+                not (offset%rl == 18 and idx % rl == 0) and    # 
                 not (offset% rl == 1 and (idx + 1) % rl == 0)  # handling edges
             ):
                 neighbors.append(neigh)
@@ -294,6 +294,9 @@ class StringManager:
                 cardinals = self.score._cardinals_cache[lib_idx]
                 neighbors = self.score._neighbor_cache[lib_idx]                
                 
+                cardinals = self.score._cardinals_cache[lib_idx]
+                neighbors = self.score._neighbor_cache[lib_idx]                
+                
                 same_string_cardinals = sum(1 for c in cardinals if string.stones[c])
 
                 friendly_neighbors = sum(1 for n in neighbors if (self.score.board[n] == string.nature))
@@ -301,23 +304,36 @@ class StringManager:
 
                 enemy_neighbors = sum(1 for n in neighbors if (self.score.board[n] == -string.nature))
                 enemy_cardinals = sum(1 for n in cardinals if (self.score.board[n] == -string.nature))
+
                 enemy_corners = enemy_neighbors - enemy_cardinals
                 
 
-                if same_string_cardinals == len(cardinals):                                                    # think about edges IMPORTANT
+                if same_string_cardinals == len(cardinals):    
                     string.addEye(lib_idx)
 
-                elif enemy_neighbors == 0 and friendly_neighbors >= 6 and friendly_cardinals == 4:
-                    string.addEye(lib_idx)
 
-                elif friendly_neighbors == 7 and enemy_neighbors == 0:
-                    string.addEye(lib_idx)
+                elif len(cardinals) == 4:    #middle of the board
+                    if enemy_neighbors == 0:
+                        if friendly_neighbors >= 6 and friendly_cardinals == 4:
+                            string.addEye(lib_idx)
 
-                if friendly_neighbors >= 6 and enemy_corners <= 1:
-                    string.addSpecialEye(lib_idx)
+                        elif friendly_neighbors == 7:
+                            string.addEye(lib_idx)
 
-                elif friendly_neighbors >= 5 and enemy_neighbors == 0:
-                    string.addEyeLike(lib_idx)
+                    if friendly_neighbors >= 6 and enemy_corners <= 1:
+                        string.addSpecialEye(lib_idx)
+
+                    elif friendly_neighbors >= 5 and enemy_neighbors == 0:
+                        string.addEyeLike(lib_idx)
+
+                elif len(cardinals) == 3:  # edge of the board
+                    if enemy_neighbors == 0:
+                        if friendly_neighbors >= 4:
+                            string.addSpecialEye(lib_idx)
+
+                        elif friendly_cardinals >= 3:
+                            string.addEyeLike(lib_idx)
+                    
 
 
 
@@ -471,8 +487,6 @@ class Debugger:
 
                 for eye_like in string.eye_likes:
                     out_eye_likes[eye_like // rl][eye_like % rl] = "🟡"  
-
-
 
                 for line_index in range(rl):
                     f.write(f"{''.join(out_libs[line_index])}   {''.join(out_eyes[line_index])}   {''.join(out_special_eyes[line_index])}   {''.join(out_eye_likes[line_index])} \n")
