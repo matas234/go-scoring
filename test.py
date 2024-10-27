@@ -418,17 +418,20 @@ class Debugger:
         rl = self.score.row_length
         with open("assets/out2.txt", "w", encoding="utf-8") as f:     
             for group in self.score.string_manager.groups:
-                out_string = [["⚫"]*rl for _ in range(rl)]
+                out_libs = [["⚫"]*rl for _ in range(rl)]
+                # out_eyes = [["⚫"]*rl for _ in range(rl)]
+                # out_special_eyes = [["⚫"]*rl for _ in range(rl)]
+                # out_eye_likes = [["⚫"]*rl for _ in range(rl)]
 
                 for idx in group.indices_of_strings:
                     string = self.score.string_manager.strings[idx]
                     for stone in np.nonzero(string.stones)[0]:
-                        out_string[stone // rl][stone % rl] = "⚪"
+                        out_libs[stone // rl][stone % rl] = "⚪"
                 
                 for idx in np.nonzero(group.liberties)[0]:
-                    out_string[idx // rl][idx % rl] = "🟢"
+                    out_libs[idx // rl][idx % rl] = "🟢"
 
-                for line in out_string:
+                for line in out_libs:
                     f.write("".join(line) + "\n")
                 f.write(f"eyes: {group.eyes}\n")  
                 f.write(f"special eyes: {group.special_eyes}\n") 
@@ -438,31 +441,41 @@ class Debugger:
     def printStringsText(self):
         rl = self.score.row_length
         with open("assets/out.txt", "w", encoding="utf-8") as f:
+            f.write(f"🟢 for liberties \n")
+            f.write(f"🔵 for eyes \n")
+            f.write(f"🟠 for special eyes \n")
+            f.write(f"🟡 for eye likes \n")
             for i in range(len(self.score.string_manager.strings)):
                 string = self.score.string_manager.strings[i]
 
-                out_string = [["⚫"]*rl for _ in range(rl)]
+                out_libs = [["⚫"]*rl for _ in range(rl)]
+                out_eyes = [["⚫"]*rl for _ in range(rl)]
+                out_special_eyes = [["⚫"]*rl for _ in range(rl)]
+                out_eye_likes = [["⚫"]*rl for _ in range(rl)]
 
                 for idx in np.nonzero(string.stones)[0]:
-                    out_string[idx // rl][idx % rl] = "⚪"
+                    out_libs[idx // rl][idx % rl] = "⚪"
+                    out_eyes[idx // rl][idx % rl] = "⚪"
+                    out_special_eyes[idx // rl][idx % rl] = "⚪"
+                    out_eye_likes[idx // rl][idx % rl] = "⚪"
 
 
                 for idx in np.nonzero(string.liberties)[0]:
-                    out_string[idx // rl][idx % rl] = "🟢"
+                    out_libs[idx // rl][idx % rl] = "🟢"
 
                 for eye in string.eyes:
-                    out_string[eye // rl][eye % rl] = "🔵"
+                    out_eyes[eye // rl][eye % rl] = "🔵"
 
                 for s_eye in string.special_eyes:
-                    out_string[s_eye // rl][s_eye % rl] = "🟠"        
+                    out_special_eyes[s_eye // rl][s_eye % rl] = "🟠"        
 
                 for eye_like in string.eye_likes:
-                    out_string[eye_like // rl][eye_like % rl] = "🟡"  
+                    out_eye_likes[eye_like // rl][eye_like % rl] = "🟡"  
 
 
 
                 for line_index in range(rl):
-                    f.write(f"{''.join(out_string[line_index])}\n")
+                    f.write(f"{''.join(out_libs[line_index])}   {''.join(out_eyes[line_index])}   {''.join(out_special_eyes[line_index])}   {''.join(out_eye_likes[line_index])} \n")
                 f.write(f"Eyes: {string.eyes}\n")
 
 

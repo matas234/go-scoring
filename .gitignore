@@ -3,3 +3,4 @@ __pycache__/
 games/
 assets/
 old/
+.vscode/
