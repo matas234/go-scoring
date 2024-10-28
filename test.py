@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from loadGame import loadGame
 
+import cProfile
+import pstats
+
 class String:
     def __init__(self, total_length: int) -> None:
         self.stones = np.zeros(total_length, dtype=int)
@@ -40,6 +43,7 @@ class String:
 
     def addPotentialEye(self, idx: int) -> None:
         self.potential_eyes.add(idx)
+
 
     def generateConnectinos(self) -> None:
         row_length = int(np.sqrt(len(self.half_connections)))
@@ -77,18 +81,25 @@ class String:
 class Group:
     def __init__(self) -> None:
         self.indices_of_strings = []
+        self.nature = 0
+
         self.eyes = 0
         self.eyes_set = set()
         self.special_eyes = set()
         self.eye_likes = set()
+
         self.territory = set()
-        self.liberties = np.zeros(0, dtype=int)
+        self.liberties = np.array
         self.stability = -1
+
+        self.stones = np.array
+
 
     def addIndex(self, idx: int) -> None:
         self.indices_of_strings.append(idx)
 
-    def computeStabbaility(self) -> None:
+
+    def computeStability(self) -> None:
         if self.eyes >= 2:
             self.stability = 100
 
@@ -151,6 +162,17 @@ class Score:
         return neighbors 
     
 
+    def initialiseAttributes(self) -> None:
+        self.bouzy.bouzyAlgorithm(8, 21)
+
+        self.string_manager.findStrings()
+        self.string_manager.findGroups()
+        self.string_manager.findEyes()
+        self.string_manager.generateGroupProperties()
+
+
+
+
 
 
 class Bouzy:
@@ -160,6 +182,16 @@ class Bouzy:
         self.intensity = 64 * abs(board) 
         self.buffer_nature = np.zeros(self.score.total_length, dtype=int)
         self.buffer_intensity = np.zeros(self.score.total_length, dtype=int)
+
+    def copyBoardToArrays(self, board) -> None:
+        np.copyto(self.nature, board)
+        self.intensity = 64 * abs(board)
+
+
+    def resetArrays(self, board) -> None:
+        self.copyBoardToArrays(board)
+        self.buffer_nature.fill(0)
+        self.buffer_intensity.fill(0)
 
     def bouzyAlgorithm(self, n, k) -> None:
         for _ in range(n):
@@ -253,10 +285,12 @@ class StringManager:
 
 
     def findGroups(self) -> None:
-        used_indices = set()
+        n = len(self.strings)
 
-        for i in range(len(self.strings)):
-            if i in used_indices:
+        used_indices = [False]*n
+
+        for i in range(n):
+            if used_indices[i]:
                 continue  
 
             current_group = Group()
@@ -265,22 +299,20 @@ class StringManager:
             while queue:
                 idx, cur_nature = queue.popleft()
 
-                if idx in used_indices:
-                    continue  
-
                 current_group.addIndex(idx)
-                used_indices.add(idx)
+                used_indices[idx] = True
+                occupied_stones = self.strings[idx].stones
 
                 for j in range(len(self.strings)):
                     nature = self.strings[j].nature
-                    if j not in used_indices and nature == cur_nature:
-                        occupied_stones = self.strings[idx].stones
+                    if not used_indices[j] and nature == cur_nature:
                         full_cons = self.strings[j].full_connections
                         half_cons = self.strings[j].half_connections
 
-                        if (np.sum((occupied_stones != 0) & (full_cons != 0)) or 
-                            np.sum((occupied_stones != 0) & (half_cons != 0)) >= 2
+                        if (np.any((occupied_stones != 0) & (full_cons != 0)) or 
+                            np.count_nonzero((occupied_stones != 0) & (half_cons != 0)) >= 2
                         ):
+                            used_indices[j] = True
                             queue.append((j, nature))
 
             self.groups.append(current_group)    
@@ -298,19 +330,22 @@ class StringManager:
                 neighbors = self.score._neighbor_cache[lib_idx]                
                 
                 same_string_cardinals = sum(1 for c in cardinals if string.stones[c])
-
                 friendly_neighbors = sum(1 for n in neighbors if (self.score.board[n] == string.nature))
                 friendly_cardinals = sum(1 for n in cardinals if (self.score.board[n] == string.nature))
-
                 enemy_neighbors = sum(1 for n in neighbors if (self.score.board[n] == -string.nature))
                 enemy_cardinals = sum(1 for n in cardinals if (self.score.board[n] == -string.nature))
-
                 enemy_corners = enemy_neighbors - enemy_cardinals
-                
 
+                # same_string_cardinals = np.count_nonzero(string.stones[cardinals])
+                # friendly_neighbors = np.count_nonzero(self.score.board[neighbors] == string.nature)
+                # friendly_cardinals = np.count_nonzero(self.score.board[cardinals] == string.nature)
+                # enemy_neighbors = np.count_nonzero(self.score.board[neighbors] == -string.nature)
+                # enemy_cardinals = np.count_nonzero(self.score.board[cardinals] == -string.nature)
+                # enemy_corners = enemy_neighbors - enemy_cardinals
+
+                
                 if same_string_cardinals == len(cardinals):    
                     string.addEye(lib_idx)
-
 
                 elif len(cardinals) == 4:    #middle of the board
                     if enemy_neighbors == 0:
@@ -335,10 +370,10 @@ class StringManager:
                             string.addEyeLike(lib_idx)
                     
 
-
-
     def generateGroupProperties(self) -> None:
-        for group in self.groups:
+        for group_idx in range(len(self.groups)):
+            group = self.groups[group_idx]
+
             group.eyes_set = set.union(*[self.strings[idx].eyes for idx in group.indices_of_strings])
             group.eyes = len(group.eyes_set)
             group.potential_eyes = set.union(*[self.strings[idx].potential_eyes for idx in group.indices_of_strings])
@@ -346,12 +381,17 @@ class StringManager:
             group.special_eyes = set.union(*[self.strings[idx].special_eyes for idx in group.indices_of_strings])
 
             group.liberties = reduce(np.add, [self.strings[idx].liberties for idx in group.indices_of_strings])
+            group.stones = reduce(np.add, [self.strings[idx].stones for idx in group.indices_of_strings])
 
-            self.locateContiguousEyesOfGroup(group)
+            group.nature = self.strings[group.indices_of_strings[0]].nature
+
+            self.locateContiguousEyesOfGroup(group_idx)
+            self.countTerritory(group_idx)
 
         
-    def locateContiguousEyesOfGroup(self, group: Group) -> None:
+    def locateContiguousEyesOfGroup(self, group_idx: int) -> None:
         visited = set()
+        group = self.groups[group_idx]
         
         def _dfs(idx: int, sequence: list, to_remove: int) -> list:
             visited.add(idx)
@@ -391,7 +431,8 @@ class StringManager:
                     group.eyes += eye_count - to_remove
 
 
-                
+    def countTerritory(self, group: Group) -> None:
+        a=1
 
 class Debugger:
     def __init__(self, score_instance: Score) -> None:
@@ -434,18 +475,13 @@ class Debugger:
         rl = self.score.row_length
         with open("assets/out2.txt", "w", encoding="utf-8") as f:     
             for group in self.score.string_manager.groups:
-                out_libs = [["⚫"]*rl for _ in range(rl)]
-                # out_eyes = [["⚫"]*rl for _ in range(rl)]
-                # out_special_eyes = [["⚫"]*rl for _ in range(rl)]
-                # out_eye_likes = [["⚫"]*rl for _ in range(rl)]
+                out_libs = [["🟤"]*rl for _ in range(rl)]
 
-                for idx in group.indices_of_strings:
-                    string = self.score.string_manager.strings[idx]
-                    for stone in np.nonzero(string.stones)[0]:
-                        out_libs[stone // rl][stone % rl] = "⚪"
-                
                 for idx in np.nonzero(group.liberties)[0]:
                     out_libs[idx // rl][idx % rl] = "🟢"
+
+                for idx in np.nonzero(group.stones)[0]:
+                    out_libs[idx // rl][idx % rl] = "⚪" if group.nature == -1 else "⚫"
 
                 for line in out_libs:
                     f.write("".join(line) + "\n")
@@ -460,20 +496,20 @@ class Debugger:
             f.write(f"🟢 for liberties \n")
             f.write(f"🔵 for eyes \n")
             f.write(f"🟠 for special eyes \n")
-            f.write(f"🟡 for eye likes \n")
+            f.write(f"🔴 for eye likes \n")
             for i in range(len(self.score.string_manager.strings)):
                 string = self.score.string_manager.strings[i]
 
-                out_libs = [["⚫"]*rl for _ in range(rl)]
-                out_eyes = [["⚫"]*rl for _ in range(rl)]
-                out_special_eyes = [["⚫"]*rl for _ in range(rl)]
-                out_eye_likes = [["⚫"]*rl for _ in range(rl)]
+                out_libs = [["🟤"]*rl for _ in range(rl)]
+                out_eyes = [["🟤"]*rl for _ in range(rl)]
+                out_special_eyes = [["🟤"]*rl for _ in range(rl)]
+                out_eye_likes = [["🟤"]*rl for _ in range(rl)]
 
                 for idx in np.nonzero(string.stones)[0]:
-                    out_libs[idx // rl][idx % rl] = "⚪"
-                    out_eyes[idx // rl][idx % rl] = "⚪"
-                    out_special_eyes[idx // rl][idx % rl] = "⚪"
-                    out_eye_likes[idx // rl][idx % rl] = "⚪"
+                    out_libs[idx // rl][idx % rl] = "⚪" if string.nature == -1 else "⚫"
+                    out_eyes[idx // rl][idx % rl] = "⚪" if string.nature == -1 else "⚫"
+                    out_special_eyes[idx // rl][idx % rl] = "⚪" if string.nature == -1 else "⚫"
+                    out_eye_likes[idx // rl][idx % rl] = "⚪" if string.nature == -1 else "⚫"
 
 
                 for idx in np.nonzero(string.liberties)[0]:
@@ -486,7 +522,7 @@ class Debugger:
                     out_special_eyes[s_eye // rl][s_eye % rl] = "🟠"        
 
                 for eye_like in string.eye_likes:
-                    out_eye_likes[eye_like // rl][eye_like % rl] = "🟡"  
+                    out_eye_likes[eye_like // rl][eye_like % rl] = "🔴"  
 
                 for line_index in range(rl):
                     f.write(f"{''.join(out_libs[line_index])}   {''.join(out_eyes[line_index])}   {''.join(out_special_eyes[line_index])}   {''.join(out_eye_likes[line_index])} \n")
@@ -494,26 +530,37 @@ class Debugger:
 
 
 
-
-board = loadGame("games/eyes.sgf")
-
-
-s = time.time()
-
-potential = Score(board = board, size = int(np.sqrt(board.size)))
-potential.bouzy.bouzyAlgorithm(8, 21)
-potential.string_manager.findStrings()
-potential.string_manager.findGroups()
-potential.string_manager.findEyes()
-potential.string_manager.generateGroupProperties()
-
-e = time.time()
-
-print(f"Took {e-s} seconds")
+########################################################################################################
 
 
+if __name__ == "__main__":
+    board = loadGame("games/game4.sgf")
 
-potential.debugger.printGroups()
-potential.debugger.printHeatMap()
-potential.debugger.printStringsText()
-potential.debugger.printGroupsText()
+
+    potential = Score(board = board, size = int(np.sqrt(board.size)))
+    cProfile.run('potential.initialiseAttributes()', 'assets/profile_data.prof')
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+    s = time.time()
+    for i in range(10):
+        potential.initialiseAttributes()
+        potential.bouzy.resetArrays(board)
+    
+    e = time.time()
+
+    profiler.disable()
+
+    print(f"Took {e-s} seconds")
+
+    with open("assets/profile_results.txt", "w") as f:
+        stats = pstats.Stats(profiler, stream=f)
+        stats.sort_stats(pstats.SortKey.TIME)
+        stats.print_stats()
+
+    # potential.initialiseAttributes()
+
+    # potential.debugger.printGroups()
+    # potential.debugger.printHeatMap()
+    # potential.debugger.printStringsText()
+    # potential.debugger.printGroupsText()
