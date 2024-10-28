@@ -183,12 +183,15 @@ class Bouzy:
     def __init__(self, score_istance: Score) -> None:
         self.score = score_istance
         self.intensity = 64 * (board) 
-        self.white_buffer = None
-        self.black_buffer = None
+        self.white_buffer = np.zeros(self.score.total_length, dtype=int)
+        self.black_buffer = np.zeros(self.score.total_length, dtype=int)
+
 
 
     def resetArrays(self, board) -> None:
         self.intensity = 64 * (board)
+        # self.white_buffer.fill(0)
+        # self.black_buffer.fill(0)
 
     def bouzyAlgorithm(self, n, k) -> None:
         for _ in range(n):
@@ -198,47 +201,77 @@ class Bouzy:
 
 
     def __dilateBoard(self) -> None:
-        board = self.score.board
+        self.white_buffer.fill(0)
+        self.black_buffer.fill(0)
+
         neighs = self.score._cardinals_cache
-        n = self.score.total_length
                     
-                    ####board != 0
-        self.white_buffer = np.array([-sum(self.intensity[neighs[i]] < 0) if all(self.intensity[neighs[i]] <= 0) and (board[i] == 0)  else 0  for i in range(n)])
-        self.black_buffer = np.array([sum(self.intensity[neighs[i]] > 0) if all(self.intensity[neighs[i]] >= 0) and (board[i] == 0)   else 0  for i in range(n)])
+
+        for i in range(self.score.total_length):
+            if all(self.intensity[neighs[i]] <= 0):
+                self.white_buffer[i] = -sum(self.intensity[neighs[i]] < 0)
+
+            elif all(self.intensity[neighs[i]] >= 0):
+                self.black_buffer[i] = sum(self.intensity[neighs[i]] > 0)
+
+
+        # self.white_buffer = np.array([
+        #     -sum(self.intensity[neighs[i]] < 0)
+        #     if all(self.intensity[neighs[i]] <= 0) 
+        #    # and (board[i] == 0)
+        #     else 0
+        #     for i in range(n)
+        # ])
+        
+        # self.black_buffer = np.array([
+        #     sum(self.intensity[neighs[i]] > 0)
+        #     if all(self.intensity[neighs[i]] >= 0)
+        #     #and (board[i] == 0)
+        #     else 0
+        #     for i in range(n)
+        # ])
 
         self.intensity += self.white_buffer + self.black_buffer
 
 
 
     def __eraseBoard(self) -> None:
-        board = self.score.board
+        self.white_buffer.fill(0)
+        self.black_buffer.fill(0)
+
         neighs = self.score._cardinals_cache
         n = self.score.total_length
 
 
-        white_buffer = np.array([
-            sum(self.intensity[neighs[i]] >= 0)
-            if (self.intensity[i] != 0)
-            and any(self.intensity[neighs[i]] >= 0)
-            and (self.intensity[i] < 0)
-            else 0
-            for i in range(n)
-        ])
+        for i in range(self.score.total_length):
+            if self.intensity[i] < 0 and any(self.intensity[neighs[i]] >= 0):
+                self.white_buffer[i] = sum(self.intensity[neighs[i]] >= 0)
+            
+            if self.intensity[i] > 0 and any(self.intensity[neighs[i]] <= 0):   
+                self.black_buffer[i] = -sum(self.intensity[neighs[i]] <= 0)
 
-        black_buffer = np.array([
-            -sum(self.intensity[neighs[i]] <= 0)
-            if (self.intensity[i] != 0)
-            and any(self.intensity[neighs[i]] <= 0)
-            and (self.intensity[i] > 0)
-            else 0
-            for i in range(n)
-        ])
+
+        # white_buffer = np.array([
+        #     sum(self.intensity[neighs[i]] >= 0)
+        #     if (self.intensity[i] < 0)
+        #     and any(self.intensity[neighs[i]] >= 0)
+        #     else 0
+        #     for i in range(n)
+        # ])
+
+        # black_buffer = np.array([
+        #     -sum(self.intensity[neighs[i]] <= 0)
+        #     if (self.intensity[i] > 0)
+        #     and any(self.intensity[neighs[i]] <= 0)
+        #     else 0
+        #     for i in range(n)
+        # ])
 
 
         self.intensity = np.where(
-            (self.intensity > 0) & (self.intensity + white_buffer + black_buffer < 0), 
+            (self.intensity > 0) & (self.intensity + self.white_buffer + self.black_buffer < 0), 
             0,
-            self.intensity + white_buffer + black_buffer
+            self.intensity + self.white_buffer + self.black_buffer
         )
  
     
