@@ -4,6 +4,7 @@ import time
 from typing import List
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import ndimage
 import seaborn as sns
 from loadGame import loadGame
 
@@ -166,8 +167,10 @@ class Score:
 
         self.string_manager.findStrings()
         self.string_manager.findGroups()
+        self.string_manager.countTerritory()
         self.string_manager.findEyes()
         self.string_manager.generateGroupProperties()
+
 
     def reset(self) -> None:
         self.bouzy.reset(self.board)
@@ -182,7 +185,7 @@ class Bouzy:
         self.intensity = 64 * abs(board) 
         self.buffer_nature = np.zeros(self.score.total_length, dtype=int)
         self.buffer_intensity = np.zeros(self.score.total_length, dtype=int)
-
+ 
     def copyBoardToArrays(self, board) -> None:
         np.copyto(self.nature, board)
         self.intensity = 64 * abs(board)
@@ -434,15 +437,53 @@ class StringManager:
         self.groups = []
 
 
-    def countTerritory(self,) -> None:
-        visited = set()
-        def _dfs(idx: int) -> None:
-            if idx in visited:
-                return
-            visited.add(idx)
-            for neigh in self.score._neighbor_cache[idx]:
-                if neigh in group.eyes_set:
-                    _dfs(neigh)
+    def countTerritory(self) -> None:
+        ##instance of nature reshaped to be 2d matrix
+        nature = self.score.bouzy.nature.reshape(self.score.row_length, self.score.row_length)
+
+        labeled_b_ter, num_b_ters = ndimage.label(nature > 0)
+        labeled_w_ter, nums_w_ters = ndimage.label(nature < 0)
+
+        labeled_b_ter = labeled_b_ter.ravel()
+        labeled_w_ter = labeled_w_ter.ravel()
+
+        white_regions_sets = [set() for _ in range(nums_w_ters)]
+        black_regions_sets = [set() for _ in range(num_b_ters)]
+
+
+        for idx in range(self.score.total_length):
+            if self.score.bouzy.nature[idx] > 0:
+                black_regions_sets[labeled_b_ter[idx] - 1].add(idx)
+            elif self.score.bouzy.nature[idx] < 0:
+                white_regions_sets[labeled_w_ter[idx] - 1].add(idx)
+
+        self.score.debugger.printTerritoryGroups(white_regions_sets, black_regions_sets)
+
+        for group in self.groups:
+            if group.nature == -1:
+                group.territory = set.union(
+                    *[white_regions_sets[idx] - group.stones 
+                    if (white_regions_sets[idx] & group.stones)
+                    else set() 
+                    for idx in range(nums_w_ters)]
+                )
+            elif group.nature == 1:
+                group.territory = set.union(
+                    *[(black_regions_sets[idx] - group.stones) 
+                    if (black_regions_sets[idx] & group.stones)
+                    else set()
+                    for idx in range(num_b_ters)]
+                )
+
+        ## re-flatten nature once done (might not be necessary)
+        self.score.bouzy.nature.ravel()
+
+
+
+
+
+
+        
 
 
     
@@ -489,19 +530,45 @@ class Debugger:
         with open("assets/out2.txt", "w", encoding="utf-8") as f:     
             for group in self.score.string_manager.groups:
                 out_libs = [["🟤"]*rl for _ in range(rl)]
+                out_ter = [["🟤"]*rl for _ in range(rl)]
 
                 for idx in group.liberties:
                     out_libs[idx // rl][idx % rl] = "🟢"
 
                 for idx in group.stones:
                     out_libs[idx // rl][idx % rl] = "⚪" if group.nature == -1 else "⚫"
+                    out_ter[idx // rl][idx % rl] = "⚪" if group.nature == -1 else "⚫"
 
-                for line in out_libs:
-                    f.write("".join(line) + "\n")
+                for idx in group.territory:
+                    out_ter[idx // rl][idx % rl] = "🔵"
+
+                for line_index in range(rl):
+                    f.write(f"{"".join(out_libs[line_index])}   {"".join(out_ter[line_index])}  \n")
+
                 f.write(f"eyes: {group.eyes}\n")  
                 f.write(f"special eyes: {group.special_eyes}\n") 
                 f.write(f"eye likes: {group.eye_likes}\n") 
-                
+                f.write(f"territory: {len(group.territory)}\n")
+
+
+    def printTerritoryGroups(self, white_regions_sets, black_regions_sets) -> None:
+        rl = self.score.row_length
+        with open("assets/out_territory.txt", "w", encoding="utf-8") as f:
+            for white_set in white_regions_sets:
+                out_ter = [["🟤"]*rl for _ in range(rl)]
+                for idx in white_set:
+                    out_ter[idx // rl][idx % rl] = "⚪"
+                for line in out_ter:
+                    f.write(f"{"".join(line)}   \n")
+               
+                f.write(f"w territory: {white_set}\n")
+            for black_set in black_regions_sets:
+                out_ter = [["🟤"]*rl for _ in range(rl)]
+                for idx in black_set:
+                    out_ter[idx // rl][idx % rl] = "⚫"
+                for line in out_ter:
+                    f.write(f"{"".join(line)}   \n")
+                f.write(f"b territory: {black_set}\n")
 
     def printStringsText(self):
         rl = self.score.row_length
@@ -555,7 +622,7 @@ if __name__ == "__main__":
     profiler = cProfile.Profile()
     profiler.enable()
     s = time.time()
-    for i in range(1000):
+    for i in range(100):
         potential.initialiseAttributes()
         potential.reset()
     
@@ -564,8 +631,9 @@ if __name__ == "__main__":
     profiler.disable()
     potential.initialiseAttributes()
     print(f"Took {e-s} seconds")
-    print(len(potential.string_manager.strings))
+ 
 
+    potential.string_manager.countTerritory()
     with open("assets/profile_results.txt", "w") as f:
         stats = pstats.Stats(profiler, stream=f)
         stats.sort_stats(pstats.SortKey.TIME)
