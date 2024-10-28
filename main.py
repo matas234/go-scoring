@@ -170,28 +170,28 @@ class Score:
         self.string_manager.generateGroupProperties()
 
     def reset(self) -> None:
-        self.bouzy.resetArrays(self.board)
-        self.string_manager.clear()
+        self.bouzy.reset(self.board)
+        self.string_manager.reset()
     
-
-
-
-
 
 
 class Bouzy:
     def __init__(self, score_istance: Score) -> None:
         self.score = score_istance
-        self.intensity = 64 * (board) 
-        self.white_buffer = np.zeros(self.score.total_length, dtype=int)
-        self.black_buffer = np.zeros(self.score.total_length, dtype=int)
+        self.nature = score_istance.board.copy()
+        self.intensity = 64 * abs(board) 
+        self.buffer_nature = np.zeros(self.score.total_length, dtype=int)
+        self.buffer_intensity = np.zeros(self.score.total_length, dtype=int)
+
+    def copyBoardToArrays(self, board) -> None:
+        np.copyto(self.nature, board)
+        self.intensity = 64 * abs(board)
 
 
-
-    def resetArrays(self, board) -> None:
-        self.intensity = 64 * (board)
-        # self.white_buffer.fill(0)
-        # self.black_buffer.fill(0)
+    def reset(self, board) -> None:
+        self.copyBoardToArrays(board)
+        self.buffer_nature.fill(0)
+        self.buffer_intensity.fill(0)
 
     def bouzyAlgorithm(self, n, k) -> None:
         for _ in range(n):
@@ -201,80 +201,47 @@ class Bouzy:
 
 
     def __dilateBoard(self) -> None:
-        self.white_buffer.fill(0)
-        self.black_buffer.fill(0)
+        self.__copyToBuffer()        
+        for idx in range(self.score.total_length):
+            cur_nature = self.buffer_nature[idx]
 
-        neighs = self.score._cardinals_cache
-                    
-
-        for i in range(self.score.total_length):
-            if all(self.intensity[neighs[i]] <= 0):
-                self.white_buffer[i] = -sum(self.intensity[neighs[i]] < 0)
-
-            elif all(self.intensity[neighs[i]] >= 0):
-                self.black_buffer[i] = sum(self.intensity[neighs[i]] > 0)
-
-
-        # self.white_buffer = np.array([
-        #     -sum(self.intensity[neighs[i]] < 0)
-        #     if all(self.intensity[neighs[i]] <= 0) 
-        #    # and (board[i] == 0)
-        #     else 0
-        #     for i in range(n)
-        # ])
-        
-        # self.black_buffer = np.array([
-        #     sum(self.intensity[neighs[i]] > 0)
-        #     if all(self.intensity[neighs[i]] >= 0)
-        #     #and (board[i] == 0)
-        #     else 0
-        #     for i in range(n)
-        # ])
-
-        self.intensity += self.white_buffer + self.black_buffer
-
-
+            for idx_new in self.score._cardinals_cache[idx]:
+                if self.buffer_nature[idx_new] and self.buffer_nature[idx_new] != cur_nature:
+                    if cur_nature != 0:
+                        break
+                    else:
+                        cur_nature = self.buffer_nature[idx_new]
+            else:
+                if cur_nature == 0:
+                    continue 
+                
+                self.nature[idx] = cur_nature
+                for idx_new in self.score._cardinals_cache[idx]:
+                    if self.buffer_nature[idx_new] == cur_nature:
+                        self.intensity[idx] += 1
+         
 
     def __eraseBoard(self) -> None:
-        self.white_buffer.fill(0)
-        self.black_buffer.fill(0)
-
-        neighs = self.score._cardinals_cache
-        n = self.score.total_length
-
-
-        for i in range(self.score.total_length):
-            if self.intensity[i] < 0 and any(self.intensity[neighs[i]] >= 0):
-                self.white_buffer[i] = sum(self.intensity[neighs[i]] >= 0)
+        self.__copyToBuffer()
+        for idx in range(self.score.total_length):
+            cur_nature = self.buffer_nature[idx]
+            if cur_nature == 0:
+                return
             
-            if self.intensity[i] > 0 and any(self.intensity[neighs[i]] <= 0):   
-                self.black_buffer[i] = -sum(self.intensity[neighs[i]] <= 0)
+            for idx_new in self.score._cardinals_cache[idx]:
+                if self.buffer_nature[idx_new] != cur_nature:
+                    self.intensity[idx] -= 1
 
-
-        # white_buffer = np.array([
-        #     sum(self.intensity[neighs[i]] >= 0)
-        #     if (self.intensity[i] < 0)
-        #     and any(self.intensity[neighs[i]] >= 0)
-        #     else 0
-        #     for i in range(n)
-        # ])
-
-        # black_buffer = np.array([
-        #     -sum(self.intensity[neighs[i]] <= 0)
-        #     if (self.intensity[i] > 0)
-        #     and any(self.intensity[neighs[i]] <= 0)
-        #     else 0
-        #     for i in range(n)
-        # ])
-
-
-        self.intensity = np.where(
-            (self.intensity > 0) & (self.intensity + self.white_buffer + self.black_buffer < 0), 
-            0,
-            self.intensity + self.white_buffer + self.black_buffer
-        )
- 
+                if (self.intensity[idx] == 0):
+                    self.nature[idx] = 0
+                    break      
     
+    
+    def __copyToBuffer(self) -> None:
+        np.copyto(self.buffer_nature, self.nature)
+        np.copyto(self.buffer_intensity, self.intensity)
+
+
 
 
 class StringManager:
@@ -416,7 +383,7 @@ class StringManager:
 
             group.nature = self.strings[group.indices_of_strings[0]].nature
 
-            # self.locateContiguousEyesOfGroup(group_idx)
+            self.locateContiguousEyesOfGroup(group_idx)
             # self.countTerritory(group_idx)
 
         
@@ -462,13 +429,23 @@ class StringManager:
                     group.eyes += eye_count - to_remove
 
 
-    def clear(self) -> None:
+    def reset(self) -> None:
         self.strings = []
         self.groups = []
 
 
-    def countTerritory(self, group: Group) -> None:
-        a=1
+    def countTerritory(self,) -> None:
+        visited = set()
+        def _dfs(idx: int) -> None:
+            if idx in visited:
+                return
+            visited.add(idx)
+            for neigh in self.score._neighbor_cache[idx]:
+                if neigh in group.eyes_set:
+                    _dfs(neigh)
+
+
+    
 
 class Debugger:
     def __init__(self, score_instance: Score) -> None:
@@ -476,8 +453,7 @@ class Debugger:
 
     def printHeatMap(self) -> None:
         plt.figure(figsize=(8, 6))
-        map = (self.score.bouzy.intensity)
-        # map = np.where(self.score.board == 0, terr, board*64)
+        map = (self.score.bouzy.intensity) * self.score.bouzy.nature
         sns.heatmap(np.reshape(map, (self.score.row_length, self.score.row_length)), annot=True, cmap="coolwarm", cbar=True, center=0)
         plt.savefig("assets/heatmap2.png", dpi=300, bbox_inches='tight')
 
@@ -579,7 +555,7 @@ if __name__ == "__main__":
     profiler = cProfile.Profile()
     profiler.enable()
     s = time.time()
-    for i in range(10):
+    for i in range(1000):
         potential.initialiseAttributes()
         potential.reset()
     
