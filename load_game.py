@@ -1,6 +1,21 @@
 import numpy as np
 
 def loadGame(sgf_file):
+    """
+    Load a 19x19 Go game from an SGF file
+    Note if the game contains any captures, it will not work. 
+    This is only for the purposes of loading example positions from demo games on ogs.
+
+    Parameters
+    ----------
+    sgf_file : str
+        The path to the SGF file
+
+    Returns
+    -------
+    board : ndarray
+        A 1D array of length 19*19, with 0 for empty, 1 for black and -1 for white
+    """
     with open(sgf_file, 'r') as file:
         sgf_content = file.read().replace(')', "").replace('(', "").split('\n')
 
