@@ -7,18 +7,18 @@ This is an implemntation of the static go scoring algorithm in python
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/your-username/your-repo-name.git
-   cd your-repo-name
+   git clone https://github.com/matas234/go-scoring.git
+   cd go-scoring
 
-    Set up a virtual environment (recommended):
+2. **Set up a virtual environment (recommended)**:
 
-    bash
+    ```bash
 
-python -m venv env
-source env/bin/activate  # On Windows use `env\Scripts\activate`
+   python -m venv env
+   source env/bin/activate  # On Windows use `env\Scripts\activate`
 
-Install dependencies:
+3. **Install dependencies**:
 
-bash
+```bash
 
-pip install -r requirements.txt
+   pip install -r requirements.txt
