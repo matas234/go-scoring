@@ -6,7 +6,7 @@ import pstats
 
 from load_game import loadGame
 
-from string_managet import StringManager
+from string_manager import StringManager
 from bouzy import Bouzy
 from debugger import Debugger
 
@@ -57,12 +57,8 @@ class Score:
 
     def initialiseAttributes(self) -> None:
         self.bouzy.bouzyAlgorithm(8,21)
-
-
         self.string_manager.findStrings()
         self.string_manager.findGroups()
-        self.string_manager.countTerritory()
-        self.string_manager.findEyes()
         self.string_manager.generateGroupProperties()
 
 
@@ -75,40 +71,25 @@ class Score:
 
 
 if __name__ == "__main__":
-    board = loadGame("games/seki1.sgf")
+    board = loadGame("games/libs2.sgf")
 
 
     score = Score(board = board, size = int(np.sqrt(board.size)))
-    # cProfile.run('score.initialiseAttributes()', 'assets/profile_data.prof')
-
-    # profiler = cProfile.Profile()
-    # profiler.enable()
-
-    # s = time.time()
-    # for i in range(10):
-    #     score.initialiseAttributes()
-    #     score.reset()
+    cProfile.run('score.initialiseAttributes()', 'assets/profile_data.prof')
+    profiler = cProfile.Profile()
+    profiler.enable()
+    s = time.time()
+    for i in range(0):
+        score.initialiseAttributes()
+        score.reset()
     
-    # e = time.time()
-
-    # profiler.disable()
-    # score.initialiseAttributes()
-    # print(f"Took {e-s} seconds")
-
-    # score.string_manager.countTerritory()
+    e = time.time()
+    profiler.disable()
+    print(f"Took {e-s} seconds")
+    with open("assets/profile_results.txt", "w") as f:
+        stats = pstats.Stats(profiler, stream=f)
+        stats.sort_stats(pstats.SortKey.TIME)
+        stats.print_stats()
 
     score.initialiseAttributes()
-    score.string_manager.classifyLiberties()
-
-
-    # with open("assets/profile_results.txt", "w") as f:
-    #     stats = pstats.Stats(profiler, stream=f)
-    #     stats.sort_stats(pstats.SortKey.TIME)
-    #     stats.print_stats()
-
-    # score.initialiseAttributes()
-
-    score.debugger.printGroups()
-    score.debugger.printHeatMap()
-    score.debugger.printStringsText()
-    score.debugger.printGroupsText()
+    score.debugger.debug()

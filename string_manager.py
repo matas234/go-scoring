@@ -16,6 +16,7 @@ class StringManager:
         self.libs_to_groups: List[List[Group]] = [[] for _ in range(self.score.total_length)]
 
 
+
     def findStrings(self) -> None:
         visited = [False] * self.score.total_length
         cur_string = String()
@@ -41,6 +42,7 @@ class StringManager:
                 cur_string.generateConnectinos(self.score.row_length, self.score.board)
                 self.strings.append(cur_string)
                 cur_string = String()
+
 
 
     def findGroups(self) -> None:
@@ -77,6 +79,7 @@ class StringManager:
             self.groups.append(current_group)    
     
 
+
     def findEyes(self) -> None:
         for idx in range(len(self.strings)):
             string = self.strings[idx]
@@ -106,7 +109,6 @@ class StringManager:
                 enemy_corners = enemy_neighbors - enemy_cardinals
 
 
-                
                 if same_string_cardinals == len(cardinals):    
                     string.addEye(lib_idx)
 
@@ -133,6 +135,7 @@ class StringManager:
                             string.addEyeLike(lib_idx)
                     
 
+
     def generateGroupProperties(self) -> None:
         for group_idx in range(len(self.groups)):
             group = self.groups[group_idx]
@@ -149,9 +152,13 @@ class StringManager:
             group.nature = self.strings[group.indices_of_strings[0]].nature
 
             self.locateContiguousEyesOfGroup(group_idx)
-            # self.countTerritory(group_idx)
 
+        self.findEyes()
+        self.countTerritory()
+        self.classifyLiberties()
         
+
+
     def locateContiguousEyesOfGroup(self, group_idx: int) -> None:
         visited = set()
         group = self.groups[group_idx]
@@ -194,9 +201,12 @@ class StringManager:
                     group.eyes += eye_count - to_remove
 
 
+
     def reset(self) -> None:
         self.strings = []
         self.groups = []
+        self.libs_to_groups = [[] for _ in range(self.score.total_length)]
+
 
 
     def countTerritory(self) -> None:
@@ -204,34 +214,46 @@ class StringManager:
         nature = self.score.bouzy.nature.reshape(self.score.row_length, self.score.row_length)
 
         labeled_b_ter, num_b_ters = ndimage.label(nature > 0)
-        labeled_w_ter, nums_w_ters = ndimage.label(nature < 0)
-
         labeled_b_ter = labeled_b_ter.ravel()
+
+        labeled_w_ter, nums_w_ters = ndimage.label(nature < 0)
         labeled_w_ter = labeled_w_ter.ravel()
 
         white_regions_sets = [set() for _ in range(nums_w_ters)]
         black_regions_sets = [set() for _ in range(num_b_ters)]
 
+        white_total_in_region = [set() for _ in range(nums_w_ters)]
+        black_total_in_region = [set() for _ in range(num_b_ters)]
+
 
         for idx in range(self.score.total_length):
+            set_idx = labeled_b_ter[idx] - 1
             if self.score.bouzy.nature[idx] > 0:
-                black_regions_sets[labeled_b_ter[idx] - 1].add(idx)
+                black_regions_sets[set_idx].add(idx)
+
+                if self.score.board[idx] == 1:
+                    black_total_in_region[set_idx].add(idx)
+
+
             elif self.score.bouzy.nature[idx] < 0:
-                white_regions_sets[labeled_w_ter[idx] - 1].add(idx)
+                white_regions_sets[set_idx].add(idx)
+
+                if self.score.board[idx] == -1:
+                    white_total_in_region[set_idx].add(idx)
 
         # self.score.debugger.printTerritoryGroups(white_regions_sets, black_regions_sets)
 
         for group in self.groups:
             if group.nature == -1:
                 group.territory = set.union(
-                    *[(white_regions_sets[idx] - group.stones )
+                    *[(white_regions_sets[idx] - white_total_in_region[idx])
                     if (white_regions_sets[idx] & group.stones)
                     else set() 
                     for idx in range(nums_w_ters)]
                 )
             elif group.nature == 1:
                 group.territory = set.union(
-                    *[(black_regions_sets[idx] - group.stones) 
+                    *[(black_regions_sets[idx] - black_total_in_region[idx]) 
                     if (black_regions_sets[idx] & group.stones)
                     else set()
                     for idx in range(num_b_ters)]
@@ -242,62 +264,104 @@ class StringManager:
 
 
 
-
-
     def classifyLiberties(self) -> None:
         board = self.score.board
         cards = self.score._cardinals_cache
-        double_libs = 9
-
+    
         for group in self.groups:
             for lib in group.liberties:
                 self.libs_to_groups[lib].append(group)
 
+        for lib in range(self.score.total_length):
+            lib_sharing_groups = self.libs_to_groups[lib]
+            num_sharing_groups = len(lib_sharing_groups)
 
-        for group in self.groups:
-            for lib in group.liberties:
-                lib_sharing_groups = self.libs_to_groups[lib]
-                ### seki
-                if len(lib_sharing_groups) == 2:
-                    first = lib_sharing_groups[0]
-                    second = lib_sharing_groups[1]
+            if num_sharing_groups == 0:
+                continue
 
-                    # if (first.nature != second.nature):
-                    #     print("liberty shared by different coloured groups")
-                    # if (2 <= len(first.liberties) <= 4):
-                    #     print("first group has 2-4 liberties")
-                    # if (2 <= len(second.liberties) <= 4):
-                    #     print("second group has 2-4 liberties")
-                    # if (len(first.stones) >= 3):
-                    #     print("first group has at least 3 stones")
-                    # if (len(second.stones) >= 3):
-                    #     print("second group has at least 3 stones")
-                    # if (first.liberties == second.liberties):
-                    #     print("first and second group have the same liberties")
+            ### SEKI ################################################
+            if num_sharing_groups == 2:
+                first = lib_sharing_groups[0]
+                second = lib_sharing_groups[1]
 
-                    # print("")
-                    if (first.nature != second.nature and
-                        2 <= len(first.liberties) <= 4 and
-                        2 <= len(second.liberties) <= 4 and
-                        len(first.stones) >= 3 and
-                        len(second.stones) >= 3 and
-                        first.liberties == second.liberties
-                    ):
-                        
-                        first.setAsStable()
-                        second.setAsStable()
+                if (first.nature != second.nature and
+                    2 <= len(first.liberties) <= 4 and
+                    2 <= len(second.liberties) <= 4 and
+                    len(first.stones) >= 3 and
+                    len(second.stones) >= 3 and
+                    first.liberties == second.liberties
+                ):
+                    first.setAsStable()
+                    second.setAsStable()
+                    continue
+
+            ############################################################
+            
+            ###### LIBERTIES ############################################
+            cur_lib_libs = set.union(*[{i} if self.score.board[i] == 0 else set() for i in cards[lib]])
+
+            new_w_group_libs = len(cur_lib_libs.union(
+                *[group.liberties 
+                if group.nature == -1
+                else set() 
+                for group in lib_sharing_groups ]) - {lib})
+            
+            new_b_group_libs = len(cur_lib_libs.union(
+                *[group.liberties 
+                if group.nature == 1 
+                else set() 
+                for group in lib_sharing_groups ]) - {lib})
 
 
-                    ### 
-                 
 
-                
+            if new_w_group_libs == 1:
+                for group in lib_sharing_groups:
+                    if group.nature == 1:
+                        group.double_liberties.add(lib)
+                continue
 
+            elif new_b_group_libs == 1:
+                for group in lib_sharing_groups:
+                    if group.nature == -1:
+                        group.double_liberties.add(lib)
+                continue
+
+            for group in lib_sharing_groups:
+                if group.nature == -1:
+                    if len(group.liberties) < new_w_group_libs:
+                        group.half_liberties.add(lib)
+
+                    elif len(group.liberties) == new_w_group_libs:
+                        group.third_liberties.add(lib)
+
+                if group.nature == 1:
+                    if len(group.liberties) < new_b_group_libs:
+                        group.half_liberties.add(lib)
+
+                    elif len(group.liberties) == new_b_group_libs:
+                        group.third_liberties.add(lib)
+ 
+
+
+
+
+            
+
+            
+
+
+
+
+
+
+            
 
         
-    
 
 
 
 
-        
+
+
+
+

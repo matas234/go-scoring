@@ -11,38 +11,25 @@ class Debugger:
         map = (self.score.bouzy.intensity) * self.score.bouzy.nature
         sns.heatmap(np.reshape(map, (self.score.row_length, self.score.row_length)), annot=True, cmap="coolwarm", cbar=True, center=0)
         plt.savefig("assets/heatmap2.png", dpi=300, bbox_inches='tight')
-
-
-
-    def printStrings(self) -> None:
-        plt.figure(figsize=(8, 6))
-        to_plot = np.zeros(self.score.total_length, dtype=int)
-        
-        for idx, string in enumerate(self.score.string_manager.strings):
-            stones = string.stones * (idx + 1)
-            to_plot += stones 
-            for eye in string.eyes:
-                to_plot[eye] = string.nature * 100
-
-        sns.heatmap(np.reshape(to_plot, (self.score.row_length, self.score.row_length)), annot=True, cmap="binary", cbar=True, center=0)
-        plt.savefig("assets/hstrings.png", dpi=300, bbox_inches='tight')
         
 
-    def printGroups(self) -> None:
-        plt.figure(figsize=(8, 6))
-        to_plot = np.zeros(self.score.total_length, dtype=int)
-        
-        for idx, group in enumerate(self.score.string_manager.groups):
-            for j in group.indices_of_strings:
-                to_plot[list(self.score.string_manager.strings[j].stones)] = idx + 1
+    def debug(self) -> None:
+        self.printHeatMap()
+        self.printGroupsText()
+        self.printStringsText()
 
-        sns.heatmap(np.reshape(to_plot, (self.score.row_length, self.score.row_length)), annot=True, cmap="coolwarm", cbar=True, center=0)
-        plt.savefig("assets/hgroups.png", dpi=300, bbox_inches='tight')  
 
     def printGroupsText(self) -> None:
         rl = self.score.row_length
         with open("assets/out2.txt", "w", encoding="utf-8") as f:     
+            f.write(f"🟢 for liberties \n")
+            f.write(f"🔵 for territory \n")
+
+            f.write(f"🔴 for double libs \n")
+            f.write(f"🟣 for half libs \n")
+            f.write(f"🟠 for third libs \n\n\n")
             for group in self.score.string_manager.groups:
+
                 out_libs = [["🟤"]*rl for _ in range(rl)]
                 out_ter = [["🟤"]*rl for _ in range(rl)]
 
@@ -56,6 +43,15 @@ class Debugger:
                 for idx in group.territory:
                     out_ter[idx // rl][idx % rl] = "🔵"
 
+                for idx in group.double_liberties:
+                    out_libs[idx // rl][idx % rl] = "🔴"
+
+                for idx in group.half_liberties:
+                    out_libs[idx // rl][idx % rl] = "🟣"
+
+                for idx in group.third_liberties:
+                    out_libs[idx // rl][idx % rl] = "🟠"
+
                 for line_index in range(rl):
                     f.write(f"{"".join(out_libs[line_index])}   {"".join(out_ter[line_index])}  \n")
 
@@ -64,6 +60,10 @@ class Debugger:
                 f.write(f"eye likes: {group.eye_likes}\n") 
                 f.write(f"liberties: {group.liberties}\n")
                 f.write(f"stability: {group.stability}\n")
+                f.write(f"double liberties: {group.double_liberties}\n")
+                f.write(f"half liberties: {group.half_liberties}\n")
+                f.write(f"third liberties: {group.third_liberties}\n")
+         #       f.write(f"territory: {group.territory}\n")
 
 
     def printTerritoryGroups(self, white_regions_sets, black_regions_sets) -> None:

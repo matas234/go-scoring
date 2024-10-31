@@ -11,10 +11,15 @@ class Group:
         self.eye_likes = set()
 
         self.territory = set()
+        
         self.liberties = set()
+        self.double_liberties = set()
+        self.half_liberties = set()
+        self.third_liberties = set()
+
         self.stability = -1
 
-        self.stones = np.array
+        self.stones = set()
 
 
     def addIndex(self, idx: int) -> None:
