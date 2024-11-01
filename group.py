@@ -31,23 +31,25 @@ class Group:
 
 
     def computeStability(self) -> None:
-        if self.territory != -1:
-            raise RuntimeError("Stability is being recalculateted (shouldnt be happening)") 
+        if self.stability != -1:
+            return
 
+        extra_libs = len(self.half_liberties)/2 + len(self.third_liberties)/3 + len(self.double_liberties)
 
         if self.eyes >= 2:
             self.stability = 100
 
         elif (self.eyes == 1 and
-              len(self.special_eyes) + self.eye_likes >= 2 and   ##### HAVE TO BE NOT CONTIGOUS IMPORTANT
-              self.territory >= 3
+              len(self.special_eyes) + len(self.eye_likes) >= 2 and   ##### HAVE TO BE NOT CONTIGOUS IMPORTANT
+              len(self.territory) >= 3
               ):
             self.stability = 100
 
         elif (self.eyes == 0 and
-              self.territory >= 6
+              len(self.territory) >= 6
               ):
             self.stability = 100
 
         else:
-            self.stability = 520 - (self.eyes / 2) - (self.liberties * 2) - (self.territory / 2)
+            self.stability = round(520 - (self.eyes / 2) - (len(self.liberties) + extra_libs) / 2 - (len(self.territory) / 2))
+

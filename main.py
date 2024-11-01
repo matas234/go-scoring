@@ -27,19 +27,20 @@ class Score:
         self.bouzy = Bouzy(self)
 
     
-    def __computeCardinals(self, indx: int) -> List[int]:
+    def __computeCardinals(self, idx: int) -> List[int]:
         cardinals = []
         
         for offset in [self.row_length, -self.row_length, 1, -1]:
-            cardinal = indx + offset
+            cardinal = idx + offset
             if (0 <= cardinal < self.total_length and                    # in bounds of the board
-                not (offset == -1 and indx % self.row_length == 0) and   # 
-                not (offset == 1 and (indx + 1) % self.row_length == 0)  # handling edges
+                not (offset == -1 and idx % self.row_length == 0) and   # 
+                not (offset == 1 and (idx + 1) % self.row_length == 0)  # handling edges
             ):
                 cardinals.append(cardinal)
 
         return cardinals 
     
+
     def __computeNeighbors(self, idx: int) -> List[int]:
         neighbors = []
         rl = self.row_length
@@ -60,6 +61,27 @@ class Score:
         self.string_manager.findStrings()
         self.string_manager.findGroups()
         self.string_manager.generateGroupProperties()
+        self.string_manager.calculateStability()
+
+    
+    def scoreBoard(self, history = 1) -> int:
+        self.initialiseAttributes()
+        self.debugger.debug(path = "timeline", history = history)
+
+        max_stability = max(group.stability for group in self.string_manager.groups)
+
+        if max_stability == 100:
+            print("no groups to remove")
+            return 0
+        
+        groups_to_remove = [group for group in self.string_manager.groups if group.stability == max_stability]
+        for group in groups_to_remove:
+            for idx in group.stones:
+                self.board[idx] = 0
+
+        self.reset()
+     
+        return self.scoreBoard(history+1)
 
 
     def reset(self) -> None:
@@ -71,25 +93,27 @@ class Score:
 
 
 if __name__ == "__main__":
-    board = loadGame("games/libs2.sgf")
-
+    with open("timeline/board.txt", "w") as file:
+        pass
+    board = loadGame("games/game5.sgf")
 
     score = Score(board = board, size = int(np.sqrt(board.size)))
-    cProfile.run('score.initialiseAttributes()', 'assets/profile_data.prof')
-    profiler = cProfile.Profile()
-    profiler.enable()
-    s = time.time()
-    for i in range(0):
-        score.initialiseAttributes()
-        score.reset()
-    
-    e = time.time()
-    profiler.disable()
-    print(f"Took {e-s} seconds")
-    with open("assets/profile_results.txt", "w") as f:
-        stats = pstats.Stats(profiler, stream=f)
-        stats.sort_stats(pstats.SortKey.TIME)
-        stats.print_stats()
-
+    score.scoreBoard()
     score.initialiseAttributes()
     score.debugger.debug()
+
+    # cProfile.run('score.initialiseAttributes()', 'assets/profile_data.prof')
+    # profiler = cProfile.Profile()
+    # profiler.enable()
+    # s = time.time()
+    # for i in range(0):
+    #     score.initialiseAttributes()
+    #     score.reset()
+    
+    # e = time.time()
+    # profiler.disable()
+    # print(f"Took {e-s} seconds")
+    # with open("assets/profile_results.txt", "w") as f:
+    #     stats = pstats.Stats(profiler, stream=f)
+    #     stats.sort_stats(pstats.SortKey.TIME)
+    #     stats.print_stats()

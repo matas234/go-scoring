@@ -13,15 +13,16 @@ class Debugger:
         plt.savefig("assets/heatmap2.png", dpi=300, bbox_inches='tight')
         
 
-    def debug(self) -> None:
+    def debug(self, path = "assets", history = 1) -> None:
         self.printHeatMap()
-        self.printGroupsText()
-        self.printStringsText()
+        self.printGroupsText(path, history)
+        self.printStringsText(path, history)
+        self.printBoard(path)
 
 
-    def printGroupsText(self) -> None:
+    def printGroupsText(self, path, history) -> None:
         rl = self.score.row_length
-        with open("assets/out2.txt", "w", encoding="utf-8") as f:     
+        with open(f"{path}/groups{history}.txt", "w", encoding="utf-8") as f:     
             f.write(f"🟢 for liberties \n")
             f.write(f"🔵 for territory \n")
 
@@ -43,14 +44,14 @@ class Debugger:
                 for idx in group.territory:
                     out_ter[idx // rl][idx % rl] = "🔵"
 
-                for idx in group.double_liberties:
-                    out_libs[idx // rl][idx % rl] = "🔴"
+                for idx in group.third_liberties:
+                    out_libs[idx // rl][idx % rl] = "🟠"
 
                 for idx in group.half_liberties:
                     out_libs[idx // rl][idx % rl] = "🟣"
 
-                for idx in group.third_liberties:
-                    out_libs[idx // rl][idx % rl] = "🟠"
+                for idx in group.double_liberties:
+                    out_libs[idx // rl][idx % rl] = "🔴"
 
                 for line_index in range(rl):
                     f.write(f"{"".join(out_libs[line_index])}   {"".join(out_ter[line_index])}  \n")
@@ -85,9 +86,9 @@ class Debugger:
                     f.write(f"{"".join(line)}   \n")
                 f.write(f"b territory: {black_set}\n")
 
-    def printStringsText(self):
+    def printStringsText(self, path = "assets", history = 1) -> None:
         rl = self.score.row_length
-        with open("assets/out.txt", "w", encoding="utf-8") as f:
+        with open(f"{path}/strings{history}.txt", "w", encoding="utf-8") as f:
             f.write(f"🟢 for liberties \n")
             f.write(f"🔵 for eyes \n")
             f.write(f"🟠 for special eyes \n")
@@ -122,3 +123,18 @@ class Debugger:
                 for line_index in range(rl):
                     f.write(f"{''.join(out_libs[line_index])}   {''.join(out_eyes[line_index])}   {''.join(out_special_eyes[line_index])}   {''.join(out_eye_likes[line_index])} \n")
                 f.write(f"Eyes: {string.eyes}\n")
+
+
+    def printBoard(self, path = "assets") -> None:
+        rl = self.score.row_length
+        with open(f"{path}/board.txt", "a", encoding="utf-8") as f:
+            out = [["🟤"]*rl for _ in range(rl)]
+           
+            for group in self.score.string_manager.groups:
+                for idx in group.stones:
+                    out[idx // rl][idx % rl] = "⚪" if group.nature == -1 else "⚫"
+
+            for line in out:
+                f.write(f"{''.join(line)}\n")
+            f.write("\n\n\n\n")
+            

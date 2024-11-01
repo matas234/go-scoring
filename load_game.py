@@ -19,8 +19,10 @@ def loadGame(sgf_file):
     with open(sgf_file, 'r') as file:
         sgf_content = file.read().replace(')', "").replace('(', "").split('\n')
 
-    board = np.zeros((19, 19), dtype=int)
+    board_size = int(sgf_content[11][3:5])
+    board = np.zeros((board_size, board_size), dtype=int)
     offset = 1
+
 
     for move in sgf_content[14:-1]:
         if len(move) < 6: continue

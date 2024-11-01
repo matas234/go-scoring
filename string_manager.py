@@ -13,8 +13,6 @@ class StringManager:
         self.strings: List[String] = []
         self.groups: List[Group] = []
 
-        self.libs_to_groups: List[List[Group]] = [[] for _ in range(self.score.total_length)]
-
 
 
     def findStrings(self) -> None:
@@ -158,6 +156,10 @@ class StringManager:
         self.classifyLiberties()
         
 
+    def calculateStability(self) -> None:
+        for group in self.groups:
+            group.computeStability()
+
 
     def locateContiguousEyesOfGroup(self, group_idx: int) -> None:
         visited = set()
@@ -205,7 +207,7 @@ class StringManager:
     def reset(self) -> None:
         self.strings = []
         self.groups = []
-        self.libs_to_groups = [[] for _ in range(self.score.total_length)]
+        libs_to_groups = [[] for _ in range(self.score.total_length)]
 
 
 
@@ -214,9 +216,11 @@ class StringManager:
         nature = self.score.bouzy.nature.reshape(self.score.row_length, self.score.row_length)
 
         labeled_b_ter, num_b_ters = ndimage.label(nature > 0)
+        print(labeled_b_ter)
         labeled_b_ter = labeled_b_ter.ravel()
 
         labeled_w_ter, nums_w_ters = ndimage.label(nature < 0)
+        print(labeled_w_ter)
         labeled_w_ter = labeled_w_ter.ravel()
 
         white_regions_sets = [set() for _ in range(nums_w_ters)]
@@ -227,8 +231,8 @@ class StringManager:
 
 
         for idx in range(self.score.total_length):
-            set_idx = labeled_b_ter[idx] - 1
             if self.score.bouzy.nature[idx] > 0:
+                set_idx = labeled_b_ter[idx] - 1
                 black_regions_sets[set_idx].add(idx)
 
                 if self.score.board[idx] == 1:
@@ -236,12 +240,13 @@ class StringManager:
 
 
             elif self.score.bouzy.nature[idx] < 0:
+                set_idx = labeled_w_ter[idx] - 1
                 white_regions_sets[set_idx].add(idx)
 
                 if self.score.board[idx] == -1:
                     white_total_in_region[set_idx].add(idx)
 
-        # self.score.debugger.printTerritoryGroups(white_regions_sets, black_regions_sets)
+        self.score.debugger.printTerritoryGroups(white_regions_sets, black_regions_sets)
 
         for group in self.groups:
             if group.nature == -1:
@@ -265,15 +270,14 @@ class StringManager:
 
 
     def classifyLiberties(self) -> None:
-        board = self.score.board
-        cards = self.score._cardinals_cache
-    
+        libs_to_groups: List[List[Group]] = [[] for _ in range(self.score.total_length)]
+        
         for group in self.groups:
             for lib in group.liberties:
-                self.libs_to_groups[lib].append(group)
+                libs_to_groups[lib].append(group)
 
         for lib in range(self.score.total_length):
-            lib_sharing_groups = self.libs_to_groups[lib]
+            lib_sharing_groups = libs_to_groups[lib]
             num_sharing_groups = len(lib_sharing_groups)
 
             if num_sharing_groups == 0:
@@ -294,11 +298,12 @@ class StringManager:
                     first.setAsStable()
                     second.setAsStable()
                     continue
-
-            ############################################################
-            
             ###### LIBERTIES ############################################
-            cur_lib_libs = set.union(*[{i} if self.score.board[i] == 0 else set() for i in cards[lib]])
+            cur_lib_libs = set.union(
+                *[{i} 
+                  if self.score.board[i] == 0 
+                  else set() 
+                  for i in self.score._cardinals_cache[lib]])
 
             new_w_group_libs = len(cur_lib_libs.union(
                 *[group.liberties 
@@ -313,19 +318,18 @@ class StringManager:
                 for group in lib_sharing_groups ]) - {lib})
 
 
-
+            # double liberties
             if new_w_group_libs == 1:
                 for group in lib_sharing_groups:
                     if group.nature == 1:
                         group.double_liberties.add(lib)
-                continue
 
-            elif new_b_group_libs == 1:
+            if new_b_group_libs == 1:
                 for group in lib_sharing_groups:
                     if group.nature == -1:
                         group.double_liberties.add(lib)
-                continue
 
+            # half and third liberties
             for group in lib_sharing_groups:
                 if group.nature == -1:
                     if len(group.liberties) < new_w_group_libs:
@@ -334,34 +338,9 @@ class StringManager:
                     elif len(group.liberties) == new_w_group_libs:
                         group.third_liberties.add(lib)
 
-                if group.nature == 1:
+                elif group.nature == 1:
                     if len(group.liberties) < new_b_group_libs:
                         group.half_liberties.add(lib)
 
                     elif len(group.liberties) == new_b_group_libs:
                         group.third_liberties.add(lib)
- 
-
-
-
-
-            
-
-            
-
-
-
-
-
-
-            
-
-        
-
-
-
-
-
-
-
-
