@@ -131,27 +131,27 @@ class StringManager:
 
                         elif friendly_cardinals >= 3:
                             string.addEyeLike(lib_idx)
+
+                elif len(cardinals) == 2:  # corner of the board
+                    if enemy_neighbors == 0 and friendly_neighbors >= 2:
+                        string.addEyeLike(lib_idx)
                     
 
 
     def generateGroupProperties(self) -> None:
-        for group_idx in range(len(self.groups)):
-            group = self.groups[group_idx]
-
+        self.findEyes()
+        for group in self.groups:
             group.eyes_set = set.union(*[self.strings[idx].eyes for idx in group.indices_of_strings])
             group.eyes = len(group.eyes_set)
-            group.potential_eyes = set.union(*[self.strings[idx].potential_eyes for idx in group.indices_of_strings])
             group.eye_likes = set.union(*[self.strings[idx].eye_likes for idx in group.indices_of_strings])
             group.special_eyes = set.union(*[self.strings[idx].special_eyes for idx in group.indices_of_strings])
-
             group.liberties = set.union(*[set(self.strings[idx].liberties) for idx in group.indices_of_strings])
             group.stones = set.union(*[set(self.strings[idx].stones) for idx in group.indices_of_strings])
 
             group.nature = self.strings[group.indices_of_strings[0]].nature
 
-            self.locateContiguousEyesOfGroup(group_idx)
+            self.locateContiguousEyesOfGroup(group)
 
-        self.findEyes()
         self.countTerritory()
         self.classifyLiberties()
         
@@ -161,10 +161,8 @@ class StringManager:
             group.computeStability()
 
 
-    def locateContiguousEyesOfGroup(self, group_idx: int) -> None:
-        visited = set()
-        group = self.groups[group_idx]
-        
+    def locateContiguousEyesOfGroup(self, group: Group) -> None:
+        visited = set()        
         def _dfs(idx: int, sequence: list, to_remove: int) -> list:
             visited.add(idx)
 
@@ -176,14 +174,13 @@ class StringManager:
             for neigh in self.score._neighbor_cache[idx]:
                 if neigh not in visited and (neigh in group.eye_likes or neigh in group.special_eyes):
                     sequence, to_remove= _dfs(neigh, sequence, to_remove)
-            
             return sequence, to_remove
 
         for idx in group.eye_likes | group.special_eyes:
             if idx not in visited:
 
                 sequence, to_remove = _dfs(idx, [], 0)
-                
+
                 i = 0
                 eye_count = 0
                 while i < len(sequence):
@@ -207,8 +204,6 @@ class StringManager:
     def reset(self) -> None:
         self.strings = []
         self.groups = []
-        libs_to_groups = [[] for _ in range(self.score.total_length)]
-
 
 
     def countTerritory(self) -> None:
@@ -216,11 +211,9 @@ class StringManager:
         nature = self.score.bouzy.nature.reshape(self.score.row_length, self.score.row_length)
 
         labeled_b_ter, num_b_ters = ndimage.label(nature > 0)
-        print(labeled_b_ter)
         labeled_b_ter = labeled_b_ter.ravel()
 
         labeled_w_ter, nums_w_ters = ndimage.label(nature < 0)
-        print(labeled_w_ter)
         labeled_w_ter = labeled_w_ter.ravel()
 
         white_regions_sets = [set() for _ in range(nums_w_ters)]

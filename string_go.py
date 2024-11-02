@@ -7,7 +7,6 @@ class String:
         self.liberties = set()
 
         self.eyes = set()
-        self.potential_eyes = set()
         self.special_eyes = set()
         self.eye_likes = set()
         self.eyes_in_group = set()
@@ -28,8 +27,6 @@ class String:
     def addEyeLike(self, idx: int) -> None:
         self.eye_likes.add(idx)
 
-    def addPotentialEye(self, idx: int) -> None:
-        self.potential_eyes.add(idx)
 
 
     def generateConnectinos(self, row_length: int, board) -> None:

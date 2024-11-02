@@ -123,6 +123,8 @@ class Debugger:
                 for line_index in range(rl):
                     f.write(f"{''.join(out_libs[line_index])}   {''.join(out_eyes[line_index])}   {''.join(out_special_eyes[line_index])}   {''.join(out_eye_likes[line_index])} \n")
                 f.write(f"Eyes: {string.eyes}\n")
+                f.write(f"Special Eyes: {string.special_eyes}\n")
+                f.write(f"Eye Likes: {string.eye_likes}\n")
 
 
     def printBoard(self, path = "assets") -> None:

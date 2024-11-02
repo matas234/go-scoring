@@ -4,6 +4,7 @@ import numpy as np
 import cProfile
 import pstats
 
+from delete_timeline_folder import deleteTimeline
 from load_game import loadGame
 
 from string_manager import StringManager
@@ -25,6 +26,8 @@ class Score:
         self.debugger = Debugger(self)
         self.string_manager = StringManager(self)
         self.bouzy = Bouzy(self)
+
+        self.captures = {-1: 0, 1: 0}
 
     
     def __computeCardinals(self, idx: int) -> List[int]:
@@ -64,24 +67,44 @@ class Score:
         self.string_manager.calculateStability()
 
     
-    def scoreBoard(self, history = 1) -> int:
+    def scoreBoard(self, history = 1, komi = 6.5, rules = 'japanese', debug = False) -> int:
         self.initialiseAttributes()
-        self.debugger.debug(path = "timeline", history = history)
+
+        if debug:
+            self.debugger.debug(path = "timeline", history = history)
 
         max_stability = max(group.stability for group in self.string_manager.groups)
 
         if max_stability == 100:
-            print("no groups to remove")
-            return 0
+            white_ter = len(set.union(
+                *[group.territory
+                if group.nature == -1
+                else set()
+                for group in self.string_manager.groups]
+            ))
+            black_ter = len(set.union(
+                *[group.territory
+                if group.nature == 1
+                else set()
+                for group in self.string_manager.groups]
+            ))
+
+            score = white_ter - black_ter + komi
+            if rules == 'japanese':
+                score += self.captures[1] - self.captures[-1]
+            print(f"SCORE: {'B' if score < 0 else 'W'}+{abs(score)}")
+
+            return score
         
         groups_to_remove = [group for group in self.string_manager.groups if group.stability == max_stability]
         for group in groups_to_remove:
             for idx in group.stones:
                 self.board[idx] = 0
+                self.captures[group.nature] += 1
 
         self.reset()
      
-        return self.scoreBoard(history+1)
+        return self.scoreBoard(history+1, debug=debug)
 
 
     def reset(self) -> None:
@@ -93,27 +116,27 @@ class Score:
 
 
 if __name__ == "__main__":
-    with open("timeline/board.txt", "w") as file:
-        pass
-    board = loadGame("games/game5.sgf")
+    deleteTimeline()
+    board = loadGame("games/game6.sgf")
 
     score = Score(board = board, size = int(np.sqrt(board.size)))
-    score.scoreBoard()
-    score.initialiseAttributes()
-    score.debugger.debug()
+    cProfile.run('score.initialiseAttributes()', 'assets/profile_data.prof')
+    profiler = cProfile.Profile()
+    profiler.enable()
+    start = time.time()
 
-    # cProfile.run('score.initialiseAttributes()', 'assets/profile_data.prof')
-    # profiler = cProfile.Profile()
-    # profiler.enable()
-    # s = time.time()
-    # for i in range(0):
-    #     score.initialiseAttributes()
-    #     score.reset()
+
+    score.scoreBoard(debug=True )
+    score.initialiseAttributes()
     
-    # e = time.time()
-    # profiler.disable()
-    # print(f"Took {e-s} seconds")
-    # with open("assets/profile_results.txt", "w") as f:
-    #     stats = pstats.Stats(profiler, stream=f)
-    #     stats.sort_stats(pstats.SortKey.TIME)
-    #     stats.print_stats()
+    
+    end = time.time()
+    print(f"Took {end-start} seconds")
+    profiler.disable()
+    with open("assets/profile_results.txt", "w") as f:
+        stats = pstats.Stats(profiler, stream=f)
+        stats.sort_stats(pstats.SortKey.TIME)
+        stats.print_stats()
+
+
+    score.debugger.debug()
