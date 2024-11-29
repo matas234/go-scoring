@@ -1,6 +1,8 @@
 from collections import defaultdict, deque
 from typing import List
 
+import copy
+
 from scipy import ndimage
 
 from group import Group
@@ -17,29 +19,28 @@ class StringManager:
 
     def findStrings(self) -> None:
         visited = [False] * self.score.total_length
-        cur_string = String()
 
         def _dfs(idx: int) -> None:
+            if visited[idx]:
+                return
+
             visited[idx] = True
             cur_string.addStone(idx)
 
             for idx_new in self.score._cardinals_cache[idx]:
-                if (not visited[idx_new]):
+                if not visited[idx_new]:
                     if self.score.board[idx_new] == cur_string.nature:
                         _dfs(idx_new)
                     elif self.score.board[idx_new] == 0:
                         cur_string.addLiberty(idx_new)
 
         for idx in range(self.score.total_length):
-            if self.score.board[idx] != 0 and not visited[idx]: 
-                nature = self.score.board[idx]
-                cur_string.nature = nature
-
+            if self.score.board[idx] != 0 and not visited[idx]:
+                cur_string = String()
+                cur_string.nature = self.score.board[idx]
                 _dfs(idx)
-
                 cur_string.generateConnectinos(self.score.row_length, self.score.board)
                 self.strings.append(cur_string)
-                cur_string = String()
 
 
 
@@ -50,7 +51,7 @@ class StringManager:
 
         for i in range(n):
             if used_indices[i]:
-                continue  
+                continue
 
             current_group = Group()
             queue = deque([(i, self.strings[i].nature)])
@@ -68,14 +69,14 @@ class StringManager:
                         full_cons = self.strings[j].full_connections
                         half_cons = self.strings[j].half_connections
 
-                        if (occupied_stones & full_cons or 
+                        if (occupied_stones & full_cons or
                             len((occupied_stones & half_cons)) >= 2
                         ):
                             used_indices[j] = True
                             queue.append((j, nature))
 
-            self.groups.append(current_group)    
-    
+            self.groups.append(current_group)
+
 
 
     def findEyes(self) -> None:
@@ -107,7 +108,7 @@ class StringManager:
                 enemy_corners = enemy_neighbors - enemy_cardinals
 
 
-                if same_string_cardinals == len(cardinals):    
+                if same_string_cardinals == len(cardinals):
                     string.addEye(lib_idx)
 
                 elif len(cardinals) == 4:    #middle of the board
@@ -135,7 +136,7 @@ class StringManager:
                 elif len(cardinals) == 2:  # corner of the board
                     if enemy_neighbors == 0 and friendly_neighbors >= 2:
                         string.addEyeLike(lib_idx)
-                    
+
 
 
     def generateGroupProperties(self) -> None:
@@ -154,7 +155,7 @@ class StringManager:
 
         self.countTerritory()
         self.classifyLiberties()
-        
+
 
     def calculateStability(self) -> None:
         for group in self.groups:
@@ -162,7 +163,7 @@ class StringManager:
 
 
     def locateContiguousEyesOfGroup(self, group: Group) -> None:
-        visited = set()        
+        visited = set()
         def _dfs(idx: int, sequence: list, to_remove: int) -> list:
             visited.add(idx)
 
@@ -184,13 +185,13 @@ class StringManager:
                 i = 0
                 eye_count = 0
                 while i < len(sequence):
-                    if i <= len(sequence) - 2:  
+                    if i <= len(sequence) - 2:
                         if sequence[i:i+2] in [['E', 'S'], ['S', 'E'], ['S', 'S']]:
                             eye_count += 1
-                            i += 2 
+                            i += 2
                             continue
-                
-                    elif i <= len(sequence) - 3:  
+
+                    elif i <= len(sequence) - 3:
                         if sequence[i:i+3] == ['E', 'E', 'E']:
                             eye_count += 1
                             i += 3
@@ -244,17 +245,22 @@ class StringManager:
         for group in self.groups:
             if group.nature == -1:
                 group.territory = set.union(
-                    *[(white_regions_sets[idx] - white_total_in_region[idx])
-                    if (white_regions_sets[idx] & group.stones)
-                    else set() 
-                    for idx in range(nums_w_ters)]
+                    *[
+                        (white_regions_sets[idx] - white_total_in_region[idx])
+                        if (white_regions_sets[idx] & group.stones)
+                        else set()
+                        for idx in range(nums_w_ters)
+                    ]
                 )
+
             elif group.nature == 1:
                 group.territory = set.union(
-                    *[(black_regions_sets[idx] - black_total_in_region[idx]) 
-                    if (black_regions_sets[idx] & group.stones)
-                    else set()
-                    for idx in range(num_b_ters)]
+                    *[
+                        (black_regions_sets[idx] - black_total_in_region[idx])
+                        if (black_regions_sets[idx] & group.stones)
+                        else set()
+                        for idx in range(num_b_ters)
+                    ]
                 )
 
         ## re-flatten nature once done (might not be necessary)
@@ -264,7 +270,7 @@ class StringManager:
 
     def classifyLiberties(self) -> None:
         libs_to_groups: List[List[Group]] = [[] for _ in range(self.score.total_length)]
-        
+
         for group in self.groups:
             for lib in group.liberties:
                 libs_to_groups[lib].append(group)
@@ -278,37 +284,47 @@ class StringManager:
 
             ### SEKI ################################################
             if num_sharing_groups == 2:
-                first = lib_sharing_groups[0]
-                second = lib_sharing_groups[1]
+                seki_was_set = self.handleSeki(lib_sharing_groups)
 
-                if (first.nature != second.nature and
-                    2 <= len(first.liberties) <= 4 and
-                    2 <= len(second.liberties) <= 4 and
-                    len(first.stones) >= 3 and
-                    len(second.stones) >= 3 and
-                    first.liberties == second.liberties
-                ):
-                    first.setAsStable()
-                    second.setAsStable()
+                if seki_was_set:
                     continue
-            ###### LIBERTIES ############################################
-            cur_lib_libs = set.union(
-                *[{i} 
-                  if self.score.board[i] == 0 
-                  else set() 
-                  for i in self.score._cardinals_cache[lib]])
 
-            new_w_group_libs = len(cur_lib_libs.union(
-                *[group.liberties 
-                if group.nature == -1
-                else set() 
-                for group in lib_sharing_groups ]) - {lib})
-            
-            new_b_group_libs = len(cur_lib_libs.union(
-                *[group.liberties 
-                if group.nature == 1 
-                else set() 
-                for group in lib_sharing_groups ]) - {lib})
+            if num_sharing_groups >= 2:
+                self.handleSnapback(lib_sharing_groups, lib)
+
+
+            ###### LIBERTIES ############################################
+            ## "liberties" of the current liberty
+            cur_lib_libs = set.union(
+                *[
+                    {i}
+                    if self.score.board[i] == 0
+                    else set()
+                    for i in self.score._cardinals_cache[lib]
+                ]
+            )
+
+            new_w_group_libs = len(
+                cur_lib_libs.union(
+                    *[
+                        group.liberties
+                        if group.nature == -1
+                        else set()
+                        for group in lib_sharing_groups
+                    ]
+                ) - {lib}
+            )
+
+            new_b_group_libs = len(
+                cur_lib_libs.union(
+                    *[
+                        group.liberties
+                        if group.nature == 1
+                        else set()
+                        for group in lib_sharing_groups
+                    ]
+                ) - {lib}
+            )
 
 
             # double liberties
@@ -337,3 +353,90 @@ class StringManager:
 
                     elif len(group.liberties) == new_b_group_libs:
                         group.third_liberties.add(lib)
+
+
+
+    def handleSeki(self, lib_sharing_groups: List[Group]) -> bool:
+        first, second = lib_sharing_groups
+
+        #seki
+        if (first.nature != second.nature and
+            2 <= len(first.liberties) <= 4 and
+            2 <= len(second.liberties) <= 4 and
+            len(first.stones) >= 3 and
+            len(second.stones) >= 3 and
+            first.liberties == second.liberties
+        ):
+            first.setAsStable()
+            second.setAsStable()
+            return True
+
+        return False
+
+
+
+##### DO NOT MODIFY group2 here
+    def playOutMove_Snapback(self,
+                             group1: Group,
+                             group2: Group,
+                             lib_sharing_groups: List[Group],
+                             lib: int
+                             ) -> int:
+        new_liberties = [
+                stone
+                for stone in group2.stones
+                if any(neigh in group1.stones
+                       for neigh in self.score._cardinals_cache[stone]
+                       )
+                ]
+
+
+
+        for group in lib_sharing_groups:
+            if group.nature == group1.nature:
+                group1.stones.update(group.stones)
+                group1.liberties.update(group.liberties)
+                group1.territory.update(group.territory)
+
+
+        group1.stones.add(lib)
+        group1.liberties.update(new_liberties)
+        group1.territory.update(group2.territory)
+
+        group1.computeStability()
+
+        return group1.stability
+
+
+
+    def handleSnapback(self, lib_sharing_groups: List[Group], lib: int) -> None:
+        first_ptr, second_ptr = None, None
+
+        for group in lib_sharing_groups:
+            if len(group.liberties) == 1:
+                if first_ptr is None:
+                    first_ptr = group
+                    continue
+
+                elif second_ptr is None:
+                    second_ptr = group
+                    continue
+
+        if first_ptr is None or second_ptr is None:
+            return
+
+
+        first_copy, second_copy = copy.deepcopy(first_ptr), copy.deepcopy(second_ptr)
+
+        first_stab_aftermove = self.playOutMove_Snapback(first_copy, second_ptr,
+                                                         lib_sharing_groups, lib)
+
+        second_stab_aftermove = self.playOutMove_Snapback(second_copy, first_ptr,
+                                                          lib_sharing_groups, lib)
+
+        if first_stab_aftermove == 100:
+            print("SNAP")
+            first_ptr.setAsStable()
+        elif second_stab_aftermove == 100:
+            print("SNAP")
+            second_ptr.setAsStable()
