@@ -6,6 +6,7 @@ import pstats
 
 from delete_timeline_folder import deleteTimeline
 from load_game import loadGame
+from open_dataset import load_dataset_game
 
 from string_manager import StringManager
 from bouzy import Bouzy
@@ -67,7 +68,7 @@ class Score:
         self.string_manager.calculateStability()
 
 
-    def scoreBoard(self, history = 1, komi = 6.5, rules = 'japanese', debug = False) -> int:
+    def scoreBoard(self, history = 1, komi = 5.5, rules = 'japanese', debug = False) -> int:
         self.initialiseAttributes()
 
         if debug:
@@ -92,11 +93,15 @@ class Score:
             score = white_ter - black_ter + komi
             if rules == 'japanese':
                 score += self.captures[1] - self.captures[-1]
+                print(self.captures)
             print(f"SCORE: {'B' if score < 0 else 'W'}+{abs(score)}")
 
             return score
 
-        groups_to_remove = [group for group in self.string_manager.groups if group.stability == max_stability]
+        groups_to_remove = [group
+                            for group in self.string_manager.groups
+                            if group.stability == max_stability]
+
         for group in groups_to_remove:
             for idx in group.stones:
                 self.board[idx] = 0
@@ -117,10 +122,15 @@ class Score:
 
 if __name__ == "__main__":
     deleteTimeline()
-    board = loadGame("games/snapback.sgf")
+    # board = loadGame("games/snapback.sgf")
+    start = time.time()
+    for board in load_dataset_game():
+        score = Score(board = board, size = int(np.sqrt(board.size)))
+        score.scoreBoard(debug=True)
+        break
 
-    score = Score(board = board, size = int(np.sqrt(board.size)))
-    score.scoreBoard(debug=True)
+    end = time.time()
+    print(f"Took {end-start} seconds")
     # cProfile.run('score.initialiseAttributes()', 'assets/profile_data.prof')
     # profiler = cProfile.Profile()
     # profiler.enable()
