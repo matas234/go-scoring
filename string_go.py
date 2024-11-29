@@ -29,7 +29,7 @@ class String:
 
 
 
-    def generateConnectinos(self, row_length: int, board) -> None:
+    def generateConnectios(self, row_length: int, board) -> None:
         for idx in self.stones:
             x = idx // row_length
             y = idx % row_length
@@ -38,27 +38,33 @@ class String:
                 nx = x + dx
                 ny = y + dy
 
+                ## preliminary indexing check
                 if (0 <= nx < row_length and
-                    0 <= ny < row_length and 
-                    nx*row_length + ny not in self.stones and             
+                    0 <= ny < row_length and
+                    ## TODO CHECK IF THESE ARE NECESSARY
+                    nx*row_length + ny not in self.stones and
                     x*row_length + ny not in self.stones and
-                    nx*row_length + y not in self.stones and 
-                    (board[nx*row_length + y] == 0 and              ######HERE
-                    board[x*row_length + ny] == 0) 
-
+                    nx*row_length + y not in self.stones
                 ):
-                    self.full_connections.add(nx*row_length + ny)
+                    if (board[nx*row_length + y] == 0 and
+                        board[x*row_length + ny] == 0):
+                        self.full_connections.add(nx*row_length + ny)
+
+                    elif (board[nx*row_length + y] == 0 or
+                        board[x*row_length + ny] == 0):
+
+                        self.half_connections.add(nx*row_length + ny)
+
 
             for dx, dy in [(1,0), (-1, 0), (0, 1), (0, -1)]:
                 nx = x + 2*dx
-                ny = y + 2*dy        
+                ny = y + 2*dy
 
                 if (0 <= nx < row_length and
-                    0 <= ny < row_length and 
-                    nx*row_length + ny not in self.stones and 
+                    0 <= ny < row_length and
+                    nx*row_length + ny not in self.stones and
                     nx*row_length + ny not in self.full_connections and
-                    board[(x+dx)*row_length + y] == 0 and 
+                    board[(x+dx)*row_length + y] == 0 and
                     (x+dx)*row_length + (y+dy) not in self.stones
                 ):
-                    self.half_connections.add(nx*row_length + ny)     
-                
+                    self.half_connections.add(nx*row_length + ny)

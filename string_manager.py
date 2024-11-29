@@ -39,7 +39,7 @@ class StringManager:
                 cur_string = String()
                 cur_string.nature = self.score.board[idx]
                 _dfs(idx)
-                cur_string.generateConnectinos(self.score.row_length, self.score.board)
+                cur_string.generateConnectios(self.score.row_length, self.score.board)
                 self.strings.append(cur_string)
 
 
